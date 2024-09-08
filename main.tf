@@ -161,7 +161,7 @@ data "aws_iam_policy_document" "codepipeline" {
       "s3:GetBucketVersioning"
     ]
     effect    = "Allow"
-    resources = ["${aws_s3_bucket.artifact_bucket.*.arn}/*"]
+    resources = ["${aws_s3_bucket.artifact_bucket.arn}/*"]
   }
 
   statement {
