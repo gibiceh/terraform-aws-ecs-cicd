@@ -1,0 +1,281 @@
+data "aws_ecs_task_definition" "this" {
+  count           = var.create_ecs_app ? 1 : 0
+  task_definition = join("", aws_ecs_task_definition.this.*.arn)
+  depends_on      = [aws_ecs_task_definition.this]
+}
+
+# DRY module implementations::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+# Resources ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+resource "aws_cloudwatch_log_group" "this" {
+  count             = var.create_ecs_app ? 1 : 0
+  name              = var.name
+  tags              = local.tags
+  retention_in_days = var.log_retention_in_days
+}
+
+resource "aws_ecs_task_definition" "this" {
+  family                   = var.task_definition_family
+  count                    = var.create_ecs_app ? 1 : 0
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = var.container_cpu
+  memory                   = var.container_memory
+  execution_role_arn       = join("", aws_iam_role.ecs_task_execution_role.*.arn)
+  task_role_arn            = join("", aws_iam_role.ecs_task_role.*.arn)
+  container_definitions = jsonencode([{
+    name        = "${var.name}-container"
+    image       = "${var.container_image}:latest"
+    essential   = true
+    environment = var.container_environment
+    portMappings = [{
+      protocol      = "tcp"
+      containerPort = var.container_port
+      hostPort      = var.container_port
+    }]
+
+    environment = var.container_env_variables
+
+    environmentFiles = var.container_env_files
+
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        awslogs-group         = join("", aws_cloudwatch_log_group.this.*.name)
+        awslogs-stream-prefix = "ecs"
+        awslogs-region        = var.region
+      }
+    }
+  }])
+
+  tags = local.tags
+}
+
+#: And here we can already see that in order to run a task, we have to give our task a task role.
+#: This role regulates what AWS services the task has access to, e.g. your application is using a DynamoDB, then the task role must give the task access to Dynamo.
+resource "aws_iam_role" "ecs_task_role" {
+  count = var.create_ecs_app ? 1 : 0
+  name  = "${var.name}-ecsTaskRole"
+
+  assume_role_policy = <<EOF
+{
+ "Version": "2012-10-17",
+ "Statement": [
+   {
+     "Action": "sts:AssumeRole",
+     "Principal": {
+       "Service": "ecs-tasks.amazonaws.com"
+     },
+     "Effect": "Allow",
+     "Sid": ""
+   }
+ ]
+}
+EOF
+  tags               = local.tags
+}
+
+resource "aws_iam_policy" "this" {
+  count       = var.create_ecs_app ? 1 : 0
+  name        = "${var.name}-task-policy-dynamodb"
+  description = "Policy for the ecs_app:  ${var.name}"
+
+  policy = var.iam_task_policy
+}
+
+resource "aws_iam_role_policy_attachment" "ecs-task-role-policy-attachment" {
+  count      = var.create_ecs_app ? 1 : 0
+  role       = join("", aws_iam_role.ecs_task_role.*.name)
+  policy_arn = join("", aws_iam_policy.this.*.arn)
+}
+
+#: But another role is needed, the task execution role. This is due to the fact that the tasks will be executed “serverless” with the Fargate configuration.
+#: This enables the service to e.g. pull the image from ECR, spin up or deregister tasks etc. AWS provides you with a predefined policy for this, so I just attached this to my role:
+resource "aws_iam_role" "ecs_task_execution_role" {
+  count = var.create_ecs_app ? 1 : 0
+  name  = "${var.name}-ecsTaskExecutionRole"
+
+  assume_role_policy = <<EOF
+{
+ "Version": "2012-10-17",
+ "Statement": [
+   {
+     "Action": "sts:AssumeRole",
+     "Principal": {
+       "Service": "ecs-tasks.amazonaws.com"
+     },
+     "Effect": "Allow",
+     "Sid": ""
+   }
+ ]
+}
+EOF
+  tags               = local.tags
+}
+
+resource "aws_iam_role_policy_attachment" "ecs-task-execution-role-policy-attachment" {
+  count      = var.create_ecs_app ? 1 : 0
+  role       = join("", aws_iam_role.ecs_task_execution_role.*.name)
+  policy_arn = "arn:aws:iam::aws:policy/PowerUserAccess"
+  #: QUESTION
+  # Need to limit to below role and then access to s3 bucket for env variables
+  # policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+#: A security group is needed for the ECS task that will later house our container, 
+#: allowing ingress access only to the port that is exposed by the task.
+resource "aws_security_group" "ecs_tasks" {
+  count  = var.create_ecs_app ? 1 : 0
+  name   = "${var.name}-sg-task"
+  vpc_id = var.vpc_id
+
+  ingress {
+    protocol  = "tcp"
+    from_port = var.container_port
+    to_port   = var.container_port
+    # cidr_blocks = ["0.0.0.0/0"] 
+    security_groups = var.sg_ingress
+    # ipv6_cidr_blocks = ["::/0"]
+  }
+
+  egress {
+    protocol    = "-1"
+    from_port   = 0
+    to_port     = 0
+    cidr_blocks = ["0.0.0.0/0"]
+    # ipv6_cidr_blocks = ["::/0"]
+  }
+}
+
+#: So now there is a cluster, there is a task definition, all that is needed now to run this task is a service.
+#: A service in the ECS world is basically a configuration that says how many of my tasks should run in parallel, and makes sure that there always are enough health taks running. Here the service configuration I came up with:
+#: Two notable points here: This is the first time I had to use the lifecycle property of Terraform, which gives you control over how Terraform treats this resource during creation, update and destroying.
+#: In this case I had to tell Terraform that when I run an update on my infrastructure, it should ignore which task definition is currently set in the service and what is the desired number of task run by the service.
+#: The task definition I have to ignore because with every update/deployment of the application, I create a new task definition revision, meaning the revision changes outside of Terraform. So in order for Terraform not thinking it has to set the task_definition back to a previous version, we have to ignore it.
+#: The desired number of tasks needs to be ignored because I also attached autoscaling rules to the service (more on that later) which allow the service to down- or upscale the number of tasks based on the load.
+
+
+resource "aws_ecs_service" "lb" {
+  count           = var.use_alb && var.create_ecs_app && !var.create_service_discovery ? 1 : 0
+  name            = "${var.name}-service"
+  cluster         = var.ecs_cluster
+  task_definition = join("", aws_ecs_task_definition.this.*.arn)
+
+  desired_count                      = var.container_desired_count
+  deployment_minimum_healthy_percent = 50
+  deployment_maximum_percent         = 200
+  launch_type                        = "FARGATE"
+  scheduling_strategy                = "REPLICA"
+  health_check_grace_period_seconds  = 120
+
+  network_configuration {
+    security_groups  = [join("", aws_security_group.ecs_tasks.*.id)]
+    subnets          = var.task_subnets
+    assign_public_ip = false
+  }
+
+  load_balancer {
+    target_group_arn = var.ecs_app_target_group_arns[0]
+    container_name   = "${var.name}-container"
+    container_port   = var.container_port
+  }
+
+  /*
+  load_balancer {
+    target_group_arn = var.ecs_app_target_group_arns[1]
+    container_name   = "${var.name}-container"
+    container_port   = var.container_port
+  }
+*/
+  deployment_controller {
+    type = "CODE_DEPLOY"
+  }
+
+  lifecycle {
+    ignore_changes = [task_definition, desired_count, load_balancer]
+  }
+
+  tags = local.tags
+}
+
+/*
+#: Autoscaling
+#: As you can see, I defined that the maximum number of task to be run should be 4, while at least one task should be running at all time. And to this target, I can now attach rules.
+resource "aws_appautoscaling_target" "ecs_target" {
+  count              = var.create_ecs_app ? 1 : 0
+  max_capacity       = var.container_max_capacity
+  min_capacity       = var.container_min_capacity
+  resource_id        = "service/${var.ecs_cluster_name}/${var.name}-service"
+  scalable_dimension = "ecs:service:DesiredCount"
+  service_namespace  = "ecs"
+}
+
+#: You can have multiple rules on when to scale the number of tasks, namely based on either memory usage or cpu utilization. For demonstration purposes, I added both rules:
+#: So with this configuration, if the average memory utilization rises over 80 percent or the average cpu utilization is more than 60, the service will automatically put more tasks to work (up to a maximum of four as defined in the scaling target). Also, if the utilization is constantly below these targets, the service will deregister tasks down to the minimum capacity defined in the scaling target.
+resource "aws_appautoscaling_policy" "ecs_policy_memory" {
+  count              = var.create_ecs_app ? 1 : 0
+  name               = "memory-autoscaling"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = join("", aws_appautoscaling_target.ecs_target.*.resource_id)
+  scalable_dimension = join("", aws_appautoscaling_target.ecs_target.*.scalable_dimension)
+  service_namespace  = join("", aws_appautoscaling_target.ecs_target.*.service_namespace)
+
+  target_tracking_scaling_policy_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ECSServiceAverageMemoryUtilization"
+    }
+
+    target_value = 80
+  }
+}
+
+resource "aws_appautoscaling_policy" "ecs_policy_cpu" {
+  count              = var.create_ecs_app ? 1 : 0
+  name               = "cpu-autoscaling"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = join("", aws_appautoscaling_target.ecs_target.*.resource_id)
+  scalable_dimension = join("", aws_appautoscaling_target.ecs_target.*.scalable_dimension)
+  service_namespace  = join("", aws_appautoscaling_target.ecs_target.*.service_namespace)
+
+  target_tracking_scaling_policy_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ECSServiceAverageCPUUtilization"
+    }
+
+    target_value = 60
+  }
+}
+*/
+
+resource "aws_service_discovery_private_dns_namespace" "this" {
+  count       = var.create_service_discovery ? 1 : 0
+  name        = "${var.name}.local"
+  description = "${var.name}.local"
+  vpc         = var.vpc_id
+}
+
+resource "aws_service_discovery_service" "this" {
+  count = var.create_service_discovery ? 1 : 0
+  name  = "internal"
+
+  dns_config {
+    namespace_id = join("", aws_service_discovery_private_dns_namespace.this.*.id)
+
+    dns_records {
+      ttl  = 10
+      type = "A"
+    }
+
+    routing_policy = "MULTIVALUE"
+  }
+
+  health_check_custom_config {
+    failure_threshold = 1
+  }
+}
+
+
+# Outputs ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+## Please include in ./outputs.tf
+
+

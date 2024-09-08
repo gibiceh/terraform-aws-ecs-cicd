@@ -1,0 +1,10 @@
+
+locals {
+  component = {
+    "component" = var.component
+  }
+  tags = merge(
+    var.tags,
+    local.component
+  )
+}

@@ -1,0 +1,47 @@
+# Resources ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+#: We need a place where the docker image can be pulled from by the ECS service
+resource "aws_ecr_repository" "this" {
+  count = var.create_ecr ? 1 : 0
+  name  = var.name
+
+  image_tag_mutability = var.ecr_image_tag_mutability
+
+  encryption_configuration {
+    encryption_type = "AES256"
+  }
+
+  image_scanning_configuration {
+    scan_on_push = var.ecr_scan_images_on_push
+  }
+
+  tags = local.tags
+}
+
+#:  ECR lifecycle policy, to make sure not to keep too many versions of image, 
+#:  due to a new image being created with every deployment. 
+resource "aws_ecr_lifecycle_policy" "this" {
+  count      = var.create_ecr ? 1 : 0
+  repository = concat(aws_ecr_repository.this.*.name, [""])[0]
+
+  policy = jsonencode({
+    rules = [{
+      rulePriority = 1
+      description  = "keep last 10 images"
+      action = {
+        type = "expire"
+      }
+      selection = {
+        tagStatus   = "any"
+        countType   = "imageCountMoreThan"
+        countNumber = var.ecr_max_images
+      }
+    }]
+  })
+}
+
+
+
+# Outputs ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+## Please include in ./outputs.tf
+
