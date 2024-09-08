@@ -41,7 +41,7 @@ data "aws_iam_policy_document" "assume_by_codebuild" {
   }
 }
 
-resource "aws_iam_role" "codebuild_role" {
+resource "aws_iam_role" "codebuild" {
   name               = "${var.name}-codebuild"
   assume_role_policy = data.aws_iam_policy_document.assume_by_codebuild.json
   path               = "/"
@@ -66,7 +66,7 @@ data "aws_iam_policy_document" "codebuild" {
       "s3:PutObject"
     ]
     effect    = "Allow"
-    resources = ["${join("", aws_s3_bucket.artifact_bucket.*.arn)}/*"]
+    resources = ["${aws_s3_bucket.artifact_bucket.arn}/*"]
   }
 
   statement {
@@ -105,14 +105,14 @@ data "aws_iam_policy_document" "codebuild" {
 }
 
 resource "aws_iam_role_policy_attachment" "codebuild" {
-  role       = aws_iam_role.codebuild_role.name
+  role       = aws_iam_role.codebuild.name
   policy_arn = data.aws_iam_policy_document.codebuild.json
 }
 
 resource "aws_codebuild_project" "codebuild" {
 
   name         = "${var.name}-codebuild"
-  service_role = aws_iam_role.codebuild_role.arn
+  service_role = aws_iam_role.codebuild.arn
 
   artifacts {
     type = "CODEPIPELINE"
@@ -204,7 +204,7 @@ data "aws_iam_policy_document" "codepipeline" {
     ]
     effect = "Allow"
     resources = [
-      "arn:aws:lambda:${var.region}:${var.aws_account_id}:function:${var.invalidate_cdn_cache_lambda}"
+      "arn:aws:lambda:${var.aws_region}:${var.aws_account_id}:function:${var.invalidate_cdn_cache_lambda}"
     ]
   }
 }
@@ -217,9 +217,8 @@ resource "aws_iam_role" "codepipeline" {
 
 resource "aws_iam_role_policy_attachment" "codepipeline" {
   role       = aws_iam_role.codepipeline.name
-  policy_arn = aws_iam_policy.codepipeline.arn
+  policy_arn = data.aws_iam_policy_document.codepipeline.json
 }
-
 
 /*
 #: --------------------------------------------------------------------------------------------------------------------

@@ -9,6 +9,9 @@ builds/
 example/
 output/
 
+# temp
+TODO*
+
 # .tfstate files
 *.tfstate
 *.tfstate.*

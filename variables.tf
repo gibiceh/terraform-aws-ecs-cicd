@@ -4,6 +4,16 @@ variable "name" {
   type        = string
 }
 
+variable "aws_region" {
+  description = "The region to be used for all resources."
+  type        = string
+}
+
+variable "aws_account_id" {
+  description = "The account id to be used for all resources."
+  type        = string
+}
+
 variable "tags" {
   description = "This is to help add tags to the provisioned AWS resources."
   type        = map(any)
@@ -86,6 +96,7 @@ variable "codepipeline_source_git_oauth_token" {
   description = "The oauth token for the git repository."
   type        = string
   default     = ""
+  sensitive   = true
 }
 
 variable "codebuild_compute_type" {
@@ -109,6 +120,12 @@ variable "codebuild_type" {
 variable "codebuild_buildspec" {
   description = "The buildspec file for the codebuild project."
   type        = any
+}
+
+variable "container_repo_arn" {
+  description = "The arn of the ecr repository."
+  type        = string
+  default     = ""
 }
 
 
