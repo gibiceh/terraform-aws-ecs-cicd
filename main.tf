@@ -198,6 +198,7 @@ data "aws_iam_policy_document" "codepipeline" {
     resources = ["*"]
   }
 
+  /*
   statement {
     actions = [
       "lambda:InvokeFunction"
@@ -207,6 +208,7 @@ data "aws_iam_policy_document" "codepipeline" {
       "arn:aws:lambda:${var.aws_region}:${var.aws_account_id}:function:${var.invalidate_cdn_cache_lambda}"
     ]
   }
+*/
 }
 
 resource "aws_iam_role" "codepipeline" {
