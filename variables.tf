@@ -71,13 +71,13 @@ variable "codepipeline_source_owner" {
 variable "codepipeline_source_provider" {
   description = "The provider of the source code."
   type        = string
-  default     = ""
+  default     = "CodeStarSourceConnection"
 }
 
-variable "codepipeline_source_git_owner" {
+variable "codepipeline_source_git_repo_owner" {
   description = "The owner of the git repository."
   type        = string
-  default     = ""
+  default     = "AWS"
 }
 
 variable "codepipeline_source_git_repo_name" {
@@ -92,8 +92,8 @@ variable "codepipeline_source_git_repo_branch" {
   default     = ""
 }
 
-variable "codepipeline_source_git_oauth_token" {
-  description = "The oauth token for the git repository."
+variable "codepipeline_source_codestar_connection_arn" {
+  description = "The arn of the codestar connection to the git platform source."
   type        = string
   default     = ""
   sensitive   = true
@@ -128,6 +128,71 @@ variable "container_repo_arn" {
   default     = ""
 }
 
+variable "alb_listener_arn" {
+  description = "The arn of the alb listener."
+  type        = string
+  default     = ""
+}
+
+variable "ecs_app_target_group_arns" {
+  description = "The arn of the target group."
+  type        = list(string)
+  default     = []
+}
+
+variable "ecs_app_target_group_names" {
+  description = "The name of the target group."
+  type        = list(string)
+  default     = []
+}
+
+variable "container_image" {
+  description = "The image to be used for the container."
+  type        = string
+  default     = ""
+}
+
+variable "ecs_task_definition_arn" {
+  description = "The arn of the ecs task definition."
+  type        = string
+  default     = ""
+}
+
+variable "ecs_family" {
+  description = "The family of the ecs task definition."
+  type        = string
+  default     = ""
+}
+
+variable "ecs_task_subnet_id" {
+  description = "The subnet id to be used for the ecs task."
+  type        = string
+  default     = ""
+}
+
+variable "ecs_task_security_group_id" {
+  description = "The security group id to be used for the ecs task."
+  type        = string
+  default     = ""
+}
+
+variable "ecs_service_name" {
+  description = "The name of the ECS service."
+  type        = string
+  default     = ""
+}
+
+variable "ecs_container_port" {
+  description = "The port the container listens on."
+  type        = number
+  default     = 3000
+}
+
+variable "ecs_container_name" {
+  description = "The name of the container."
+  type        = string
+  default     = ""
+}
 
 
 
