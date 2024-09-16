@@ -168,13 +168,6 @@ resource "aws_codebuild_project" "codebuild" {
       value = var.ecs_task_security_group_id
     }
   }
-  /*
-  #:TODO
-  source {
-    type      = "CODEPIPELINE"
-    buildspec = var.codebuild_buildspec
-  }
-  */
   source {
     type      = "CODEPIPELINE"
     buildspec = <<BUILDSPEC

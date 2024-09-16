@@ -117,11 +117,6 @@ variable "codebuild_type" {
   default     = "LINUX_CONTAINER"
 }
 
-variable "codebuild_buildspec" {
-  description = "The buildspec file for the codebuild project."
-  type        = any
-}
-
 variable "container_repo_arn" {
   description = "The arn of the ecr repository."
   type        = string
