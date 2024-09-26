@@ -189,5 +189,11 @@ variable "ecs_container_name" {
   default     = ""
 }
 
+variable "appspec_path" {
+  description = "The path to the appspec file."
+  type        = string
+  default     = ""
+}
+
 
 

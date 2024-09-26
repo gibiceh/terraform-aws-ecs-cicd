@@ -167,6 +167,10 @@ resource "aws_codebuild_project" "codebuild" {
       name  = "TASK_SECURITY_GROUP"
       value = var.ecs_task_security_group_id
     }
+    environment_variable {
+      name  = "APPSPEC_PATH"
+      value = var.appspec_path
+    }
   }
   source {
     type      = "CODEPIPELINE"
@@ -200,7 +204,7 @@ phases:
       - docker push $REPOSITORY_URI:$IMAGE_TAG
       - printf '[{"name":"%s","imageUri":"%s"}]' $CONTAINER_NAME $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
       - aws --region $AWS_DEFAULT_REGION ecs describe-task-definition --task-definition camcorner | jq '.taskDefinition' > taskdef.json
-      - envsubst < iac/camcorner/appspec_template.yml > appspec.yml
+      - envsubst < $APPSPEC_PATH > appspec.yml
 artifacts:
     files:
       - imagedefinitions.json
