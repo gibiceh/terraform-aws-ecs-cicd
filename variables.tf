@@ -147,6 +147,12 @@ variable "container_image" {
   default     = ""
 }
 
+variable "dockerfile_path" {
+  description = "The path to the dockerfile."
+  type        = string
+  default     = "./Dockerfile"
+}
+
 variable "ecs_task_definition_arn" {
   description = "The arn of the ecs task definition."
   type        = string
