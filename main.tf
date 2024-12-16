@@ -203,7 +203,7 @@ phases:
       - docker push $REPOSITORY_URI:latest
       - docker push $REPOSITORY_URI:$IMAGE_TAG
       - printf '[{"name":"%s","imageUri":"%s"}]' $CONTAINER_NAME $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
-      - aws --region $AWS_DEFAULT_REGION ecs describe-task-definition --task-definition camcorner | jq '.taskDefinition' > taskdef.json
+      - aws --region $AWS_DEFAULT_REGION ecs describe-task-definition --task-definition $TASK_DEFINITION_FAMILY | jq '.taskDefinition' > taskdef.json
       - envsubst < $APPSPEC_PATH > appspec.yml
 artifacts:
     files:
