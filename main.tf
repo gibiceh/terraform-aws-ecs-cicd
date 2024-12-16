@@ -198,7 +198,7 @@ phases:
       - echo Retrieve environment variables needed for the yarn build
       - aws --region $AWS_DEFAULT_REGION s3 cp s3://$S3_BUCKET_NAME/envfile.env .env || true
       - echo Building the Docker image...
-      - docker build . -t $REPOSITORY_URI:latest $DOCKERFILE_PATH
+      - docker build . -t $REPOSITORY_URI:latest -f $DOCKERFILE_PATH
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
   post_build:
     commands:
