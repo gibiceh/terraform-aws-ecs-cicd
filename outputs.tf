@@ -3,7 +3,7 @@
 # ./cicd.tf
 output "s3_bucket_id" {
   description = "The S3 bucket ID"
-  value       = aws_s3_bucket.bucket.id
+  value       = aws_s3_bucket.artifact_bucket.id
 }
 
 /*
