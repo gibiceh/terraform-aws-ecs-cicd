@@ -1,7 +1,7 @@
 #: Locals ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 locals {
-  s3_artifact_bucket_arn = join("", aws_s3_bucket.artifact_bucket.*.arn) != null ? aws_s3_bucket.artifact_bucket.arn : var.byo_s3_bucket_artifact_arn
-  s3_artifact_bucket_id  = join("", aws_s3_bucket.artifact_bucket.*.id) != null ? aws_s3_bucket.artifact_bucket.id : var.byo_s3_bucket_artifact_id
+  s3_artifact_bucket_arn = join("", aws_s3_bucket.artifact_bucket.*.arn) != null ? aws_s3_bucket.artifact_bucket.*.arn : var.byo_s3_bucket_artifact_arn
+  s3_artifact_bucket_id  = join("", aws_s3_bucket.artifact_bucket.*.id) != null ? aws_s3_bucket.artifact_bucket.*.id : var.byo_s3_bucket_artifact_id
 }
 #: DRY module implementations:::::::::::::::::::::::::::::::::::::::::::::::::::
 
