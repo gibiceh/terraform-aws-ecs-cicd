@@ -133,7 +133,7 @@ resource "aws_codebuild_project" "codebuild" {
     compute_type                = var.codebuild_compute_type
     image                       = var.codebuild_image
     type                        = var.codebuild_type
-    privileged_mode             = true
+    privileged_mode             = false
     image_pull_credentials_type = "CODEBUILD"
 
     environment_variable {
@@ -448,6 +448,14 @@ resource "aws_codepipeline" "pipeline" {
   artifact_store {
     location = local.s3_artifact_bucket_id
     type     = "S3"
+
+    #: If you don't specify a key, AWS CodePipeline uses the default key for Amazon Simple Storage Service (Amazon S3)
+    /*
+    encryption_key {
+      id   = data.aws_kms_alias.s3kmskey.arn
+      type = "KMS"
+    }
+    */
   }
 
   stage {
