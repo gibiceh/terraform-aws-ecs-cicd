@@ -1,5 +1,8 @@
 #: Locals ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
+locals {
+  s3_artifact_bucket_arn = join("", aws_s3_bucket.artifact_bucket.*.arn) != null ? aws_s3_bucket.artifact_bucket.arn : var.byo_s3_bucket_artifact_arn
+  s3_artifact_bucket_id  = join("", aws_s3_bucket.artifact_bucket.*.id) != null ? aws_s3_bucket.artifact_bucket.id : var.byo_s3_bucket_artifact_id
+}
 #: DRY module implementations:::::::::::::::::::::::::::::::::::::::::::::::::::
 
 #: Resources :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -11,6 +14,7 @@
 #: -----------------------------------------------------------------------------
 
 resource "aws_s3_bucket" "artifact_bucket" {
+  count = var.create_s3_artifact_bucket ? 1 : 0
 
   bucket = var.name
 
@@ -18,7 +22,8 @@ resource "aws_s3_bucket" "artifact_bucket" {
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "s3_sse_artifact_bucket" {
-  bucket = join("", aws_s3_bucket.artifact_bucket.*.bucket)
+  count  = var.create_s3_artifact_bucket ? 1 : 0
+  bucket = join("", aws_s3_bucket.artifact_bucket.*.id)
 
   rule {
     apply_server_side_encryption_by_default {
@@ -61,7 +66,7 @@ data "aws_iam_policy_document" "codebuild" {
       "s3:PutObject"
     ]
     effect    = "Allow"
-    resources = ["${aws_s3_bucket.artifact_bucket.arn}/*"]
+    resources = ["${local.s3_artifact_bucket_arn}/*"]
   }
 
   statement {
@@ -149,7 +154,7 @@ resource "aws_codebuild_project" "codebuild" {
     }
     environment_variable {
       name  = "S3_BUCKET_NAME"
-      value = aws_s3_bucket.artifact_bucket.id
+      value = local.s3_artifact_bucket_id
     }
     environment_variable {
       name  = "SERVICE_PORT"
@@ -371,7 +376,7 @@ data "aws_iam_policy_document" "codepipeline" {
       "s3:GetBucketVersioning"
     ]
     effect    = "Allow"
-    resources = ["${aws_s3_bucket.artifact_bucket.arn}/*"]
+    resources = ["${local.s3_artifact_bucket_arn}/*"]
   }
 
   statement {
@@ -441,7 +446,7 @@ resource "aws_codepipeline" "pipeline" {
   name     = var.name
   role_arn = aws_iam_role.codepipeline.arn
   artifact_store {
-    location = aws_s3_bucket.artifact_bucket.bucket
+    location = local.s3_artifact_bucket_id
     type     = "S3"
   }
 

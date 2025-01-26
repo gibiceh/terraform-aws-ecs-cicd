@@ -32,6 +32,24 @@ variable "create_cicd_notification_pipeline" {
   default     = false
 }
 
+variable "create_s3_artifact_bucket" {
+  description = "Choice to create an s3 bucket to hold application artifacts (build inputs, docs, environment files, logs)."
+  type        = bool
+  default     = true
+}
+
+variable "byo_s3_bucket_artifact_arn" {
+  description = "This is the BYO (Bring Your Own) arn of the s3 bucket to store the artifacts."
+  type        = string
+  default     = ""
+}
+
+variable "byo_s3_bucket_artifact_id" {
+  description = "This is the BYO (Bring Your Own) ID of the s3 bucket to store the artifacts."
+  type        = string
+  default     = ""
+}
+
 variable "cloudfront_distribution_id" {
   description = "The distribution ID for Cloudfront."
   type        = string
@@ -200,6 +218,8 @@ variable "appspec_path" {
   type        = string
   default     = ""
 }
+
+
 
 
 
