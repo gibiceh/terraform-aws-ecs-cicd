@@ -518,6 +518,25 @@ resource "aws_codepipeline" "pipeline" {
   }
 }
 
+resource "aws_codestarnotifications_notification_rule" "aws_codestarnotifications_notification_rule_codepipeline" {
+  count       = var.create_cicd_notification_pipeline ? 1 : 0
+  detail_type = "BASIC"
+  event_type_ids = [
+    "codepipeline-pipeline-pipeline-execution-failed",
+    "codepipeline-pipeline-pipeline-execution-canceled",
+    "codepipeline-pipeline-pipeline-execution-started",
+    "codepipeline-pipeline-pipeline-execution-resumed",
+    "codepipeline-pipeline-pipeline-execution-succeeded",
+    "codepipeline-pipeline-pipeline-execution-superseded"
+  ]
+  name     = "${var.name}-notifications-rule-codepipeline"
+  resource = join("", aws_codepipeline.pipeline.*.arn)
+
+  target {
+    address = var.notification_topic_arn
+  }
+}
+
 #: Outputs :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #: Please include in ./outputs.tf
 
