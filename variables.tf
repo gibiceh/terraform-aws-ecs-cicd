@@ -223,3 +223,9 @@ variable "appspec_path" {
 
 
 
+
+variable "build_config_ssm_path" {
+  description = "SSM Parameter Store path holding build-time configuration (NEXT_PUBLIC_* and similar). When set, the build reads from here instead of copying envfile.env out of S3. Leave empty to keep the previous behaviour."
+  type        = string
+  default     = ""
+}

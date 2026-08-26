@@ -48,6 +48,21 @@ data "aws_iam_policy_document" "assume_by_codebuild" {
 }
 
 data "aws_iam_policy_document" "codebuild" {
+  #: Read build-time configuration from Parameter Store. Scoped to the project's
+  #: own path, not "*".
+  dynamic "statement" {
+    for_each = var.build_config_ssm_path != "" ? [1] : []
+    content {
+      sid     = "ReadBuildConfig"
+      effect  = "Allow"
+      actions = ["ssm:GetParametersByPath", "ssm:GetParameters", "ssm:GetParameter"]
+      resources = [
+        "arn:aws:ssm:${var.aws_region}:${var.aws_account_id}:parameter${var.build_config_ssm_path}",
+        "arn:aws:ssm:${var.aws_region}:${var.aws_account_id}:parameter${var.build_config_ssm_path}/*",
+      ]
+    }
+  }
+
   statement {
     actions = [
       "logs:CreateLogGroup",
@@ -156,6 +171,13 @@ resource "aws_codebuild_project" "codebuild" {
       name  = "S3_BUCKET_NAME"
       value = local.s3_artifact_bucket_id
     }
+    #: When set, the build reads NEXT_PUBLIC_* style configuration from SSM
+    #: instead of copying envfile.env out of S3. Leave empty to keep the old
+    #: behaviour -- the buildspec falls back to the S3 copy.
+    environment_variable {
+      name  = "BUILD_CONFIG_SSM_PATH"
+      value = var.build_config_ssm_path
+    }
     environment_variable {
       name  = "SERVICE_PORT"
       value = var.ecs_container_port
@@ -200,8 +222,19 @@ phases:
   build:
     commands:
       - echo Build started on `date`
-      - echo Retrieve environment variables needed for the yarn build
-      - aws --region $AWS_DEFAULT_REGION s3 cp s3://$S3_BUCKET_NAME/envfile.env .env || true
+      - echo Retrieve build-time configuration from SSM Parameter Store
+      - |
+        if [ -n "$BUILD_CONFIG_SSM_PATH" ]; then
+          aws ssm get-parameters-by-path --path "$BUILD_CONFIG_SSM_PATH" --recursive \
+            --region $AWS_DEFAULT_REGION --query 'Parameters[].[Name,Value]' --output text \
+            | awk -F'\t' '{n=$1; sub(/.*\//,"",n); print n"="$2}' > .env
+          test -s .env || { echo "FATAL: no build configuration resolved from $BUILD_CONFIG_SSM_PATH"; exit 1; }
+          grep -q "SET_ME" .env && { echo "FATAL: unpopulated placeholder in $BUILD_CONFIG_SSM_PATH"; exit 1; }
+          echo "Wrote $(wc -l < .env) build-time variables to .env"
+        else
+          echo "BUILD_CONFIG_SSM_PATH not set; falling back to envfile.env in S3"
+          aws --region $AWS_DEFAULT_REGION s3 cp s3://$S3_BUCKET_NAME/envfile.env .env
+        fi
       - echo Building the Docker image...
       - docker build . -t $REPOSITORY_URI:latest -f $DOCKERFILE_PATH
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
