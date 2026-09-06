@@ -478,6 +478,28 @@ resource "aws_iam_role_policy_attachment" "codepipeline" {
 resource "aws_codepipeline" "pipeline" {
   name     = var.name
   role_arn = aws_iam_role.codepipeline.arn
+
+  #: V2 is required for git trigger filters. Without excludes the pipeline
+  #: stays V1 and behaves exactly as before.
+  pipeline_type = length(var.trigger_excluded_file_paths) > 0 ? "V2" : "V1"
+
+  dynamic "trigger" {
+    for_each = length(var.trigger_excluded_file_paths) > 0 ? [1] : []
+    content {
+      provider_type = "CodeStarSourceConnection"
+      git_configuration {
+        source_action_name = "Source"
+        push {
+          branches {
+            includes = [var.codepipeline_source_git_repo_branch]
+          }
+          file_paths {
+            excludes = var.trigger_excluded_file_paths
+          }
+        }
+      }
+    }
+  }
   artifact_store {
     location = local.s3_artifact_bucket_id
     type     = "S3"

@@ -229,3 +229,9 @@ variable "build_config_ssm_path" {
   type        = string
   default     = ""
 }
+
+variable "trigger_excluded_file_paths" {
+  description = "File path patterns (glob) that do not trigger the pipeline on push, e.g. [\"iac/**\"]. Setting this upgrades the pipeline to V2 and adds a git push trigger filter. Empty list keeps the V1 pipeline and current behavior."
+  type        = list(string)
+  default     = []
+}
